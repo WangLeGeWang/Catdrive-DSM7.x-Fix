@@ -1,0 +1,71 @@
+mkdir -p /tmp/jioben
+cat > /tmp/jioben/ledfan.sh <<EOF
+#!/bin/sh
+if [ ! -d /sys/class/gpio/gpio450 ] ; then
+echo 450 > /sys/class/gpio/export
+fi
+echo out > /sys/class/gpio/gpio450/direction
+i2cset -y -f 0 0x45 0x00 0x55
+i2cset -y -f 0 0x45 0x01 0x01
+i2cset -y -f 0 0x45 0x30 0x07
+echo 1 > /tmp/jioben/leds.flag
+while true
+do
+sata="\$(hdparm -C /dev/sda |grep 'drive'|awk '{print \$4}')"
+ledss="\$(cat /tmp/jioben/leds.flag)"
+if [ \$sata = standby ];then
+sata_temp="1"
+led="0x03"
+leds="0"
+fi
+if [ \$sata = active/idle ];then
+sata_temp="\$(smartctl -a /dev/hda -d ata | sed -n '/Temperature_Celsius/p' | awk '{print \$10}')"
+led="0x73"
+leds="1"
+fi
+if [ \$sata_temp -ge 50 ];then
+if [ -f "/tmp/jioben/led31.flag" ] && [ \$ledss = \$leds ];then
+sleep 15
+continue
+fi
+i2cset -y -f 0 0x45 0x32 0x00
+i2cset -y -f 0 0x45 0x33 0x00
+i2cset -y -f 0 0x45 0x31 \${led}
+i2cset -y -f 0 0x45 0x34 255
+echo 1 > /sys/class/gpio/gpio450/value
+rm -rf /tmp/jioben/led*.flag
+touch /tmp/jioben/led31.flag
+echo \${leds} > /tmp/jioben/leds.flag
+fi
+if [ \$sata_temp -ge 36 ] && [ \$sata_temp -lt 50 ];then
+if [ -f "/tmp/jioben/led33.flag" ] && [ \$ledss = \$leds ];then
+sleep 15
+continue
+fi
+i2cset -y -f 0 0x45 0x31 0x00
+i2cset -y -f 0 0x45 0x32 0x00
+i2cset -y -f 0 0x45 0x33 \${led}
+i2cset -y -f 0 0x45 0x36 255 
+echo 1 > /sys/class/gpio/gpio450/value
+rm -rf /tmp/jioben/led*.flag
+touch /tmp/jioben/led33.flag
+echo \${leds} > /tmp/jioben/leds.flag
+fi
+if [ \$sata_temp -lt 36 ];then
+if [ -f "/tmp/jioben/led32.flag" ] && [ \$ledss = \$leds ];then
+sleep 15
+continue 
+fi
+i2cset -y -f 0 0x45 0x31 0x00
+i2cset -y -f 0 0x45 0x33 0x00
+i2cset -y -f 0 0x45 0x32 \${led}
+i2cset -y -f 0 0x45 0x35 255
+echo 0 > /sys/class/gpio/gpio450/value
+rm -rf /tmp/jioben/led*.flag
+touch /tmp/jioben/led32.flag
+echo \${leds} > /tmp/jioben/leds.flag
+fi
+sleep 15
+done
+EOF
+bash /tmp/jioben/ledfan.sh
