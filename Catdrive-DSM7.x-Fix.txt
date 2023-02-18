@@ -69,3 +69,4 @@ sleep 15
 done
 EOF
 bash /tmp/jioben/ledfan.sh
+bash /etc/rc.local X
